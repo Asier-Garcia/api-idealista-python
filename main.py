@@ -5,17 +5,30 @@ import base64
 client_id = 'b9lhgfyr9fkvojhpsl89p3bctizo2fk9'
 client_secret = '8ud8lnorl5K0'
 
-base_url = 'https://api.idealista.com/3.5/'
-country = 'es'
-language = 'es'
-max_items = '50'
-operation = 'rent'
-property_type = 'homes'
-order = 'priceDown'
-center = '41.3851,2.1734'
-distance = '90000'
-sort = 'desc'
-maxprice = '100000'
+BASE_URL = 'https://api.idealista.com/3.5/'
+COUNTRY = 'es'
+LANGUAGE = 'es'
+OPERATION = 'sale' # rent para alquiler
+PROPERTY_TYPE = 'homes' # offices, garages, commercial
+ORDER = 'priceDown' # priceUp
+CENTER = '41.424,2.178'
+SORT = 'desc'
+DISTANCE = 5000  # Buscar en un radio de 10 km
+
+MAX_ITEMS = 50
+MIN_PRICE = 80000
+MAX_PRICE = 160000
+MIN_SIZE = 50  # m²
+MAX_SIZE = 150  # m²
+MIN_ROOMS = 2
+MAX_ROOMS = 3
+# HAS_TERRACE = True
+# HAS_LIFT = True
+# NEW_DEVELOPMENT = False  # Excluir obra nueva
+# FURNISHED = True  # Solo amueblados
+# HAS_POOL = False  # Sin piscina
+# distance = '90000'
+# maxprice = '100000'
 
 
 # Obtención del token de acceso
@@ -41,11 +54,22 @@ def get_access_token():
 
 # Construcción de la URL de búsqueda
 def define_search_url(page_num=1):
+    """Construye la URL con los filtros personalizados"""
     url = (
-        f"{base_url}{country}/search?operation={operation}"
-        f"&maxItems={max_items}&order={order}&center={center}&distance={distance}"
-        f"&propertyType={property_type}&sort={sort}&numPage={page_num}&maxPrice={maxprice}&language={language}"
+        f"{BASE_URL}{COUNTRY}/search?"
+        f"operation={OPERATION}&propertyType={PROPERTY_TYPE}&order={ORDER}"
+        f"&sort={SORT}&maxItems={MAX_ITEMS}&numPage={page_num}&language={LANGUAGE}"
+        f"&maxPrice={MAX_PRICE}&minPrice={MIN_PRICE}"
+        f"&minSize={MIN_SIZE}&maxSize={MAX_SIZE}"
+        f"&minRooms={MIN_ROOMS}&maxRooms={MAX_ROOMS}"
+        # f"&hasTerrace={str(HAS_TERRACE).lower()}"
+        # f"&hasLift={str(HAS_LIFT).lower()}"
+        f"&center={CENTER}&distance={DISTANCE}"
+        # f"&newDevelopment={str(NEW_DEVELOPMENT).lower()}"
+        # f"&furnished={str(FURNISHED).lower()}"
+        # f"&hasPool={str(HAS_POOL).lower()}"
     )
+    
     return url
 
 
@@ -64,12 +88,28 @@ def search_api(url, token):
         raise Exception(f"Error en la búsqueda: {response.status_code} - {response.text}")
 
 
+def fetch_and_display_results(pages=1, min_photos=5):
+    """Obtiene y muestra propiedades con al menos `min_photos` fotos"""
+    try:
+        token = get_access_token()
 
-# Proceso principal
-try:
-    access_token = get_access_token()  # Obtención del token
-    search_url = define_search_url()   # Definición de la URL de búsqueda
-    result = search_api(search_url, access_token)  # Llamada a la API de búsqueda
-    print(result)  # Imprime los resultados obtenidos
-except Exception as e:
-    print(e)
+        for page in range(1, pages + 1):
+            url = define_search_url(page)
+            results = search_api(url, token)
+
+            for property in results.get("elementList", []):
+                num_photos = property.get("numPhotos", 0)  # 📷 Número de fotos
+                if num_photos < min_photos:
+                    continue  # ❌ Saltar anuncios con menos fotos
+
+                property_url = property.get("url", "No disponible")
+                address = property.get("address", property.get("neighborhood", "Ubicación no disponible"))
+                price = property.get("price", "No disponible")
+
+                print(f"📷 {num_photos} fotos | 🏠 {address} - 💰 {price}€\n🔗 {property_url}\n{'-'*50}")
+
+    except Exception as e:
+        print(e)
+
+if __name__ == "__main__":
+    fetch_and_display_results(pages=2, min_photos=5)  # 🔍 Buscar con al menos 5 fotos
